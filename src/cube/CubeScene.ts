@@ -3,6 +3,8 @@ import { RubiksCube, ForceCubieSnapshot } from './RubiksCube';
 import { CubeInteraction } from './CubeInteraction';
 import { CubeStateData, createSolvedState, MoveType, inverseMove, FaceKey } from './CubeState';
 
+const FORCE_STORAGE_KEY = 'cubemix_force_snapshot';
+
 export class CubeScene {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -14,13 +16,12 @@ export class CubeScene {
   private container: HTMLElement;
   private ro: ResizeObserver | null = null;
 
-  // Force mode
+  // Force mode (continuous / always-on once a snapshot exists)
   private forceSnapshot: ForceCubieSnapshot[] | null = null;
-  private forceModeActive = false;  // actually applying force
-  private phase1Completed = false;  // tracks if Phase 1 has completed
-  private initialVisibleFaces: Set<FaceKey> = new Set();
-  private forcedFaces: Set<FaceKey> = new Set();
-  private lastMoveWasL = false;     // tracks L→L' sequence for Phase 2
+  private forceModeActive = false; // true whenever a snapshot exists and force is running
+  // Tracks which faces were hidden on the previous frame so we only re-apply
+  // force to faces that have just become hidden (cheap, no per-frame rebuild).
+  private prevHiddenFaces: Set<FaceKey> = new Set();
   private faceNormals: Record<FaceKey, THREE.Vector3> = {
     U: new THREE.Vector3(0, 1, 0),
     D: new THREE.Vector3(0, -1, 0),
@@ -33,9 +34,6 @@ export class CubeScene {
   onForceActiveChange?: (active: boolean) => void;
   /** Fires for every executed move (drag, button, scramble, solve). */
   onUserMove?: (move: MoveType) => void;
-
-  isPhase1Completed() { return this.phase1Completed; }
-  setPhase1Completed(val: boolean) { this.phase1Completed = val; }
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -86,11 +84,15 @@ export class CubeScene {
       this.cubeGroup
     );
 
-    // Connect force trigger
+    // Connect force trigger (kept for backwards-compat; force is now automatic)
     this.interaction.onForceTrigger = () => this.activateForceMode();
 
     // Connect move listener
     this.cube.setOnMove((move) => this.handleMoveExecuted(move));
+
+    // Restore a previously saved Force snapshot so the force works permanently,
+    // without the user having to set it up again on every load.
+    this.loadPersistedSnapshot();
 
     // Resize handler
     window.addEventListener('resize', this.onResize);
@@ -129,9 +131,11 @@ export class CubeScene {
       // Smoothly interpolate any in-progress drag
       this.cube.tickDragSmoothing();
 
-      // Force mode: check if initially visible faces have become hidden
-      if (this.forceModeActive) {
-        this.checkAndForceNewlyHidden();
+      // Continuous force: while a snapshot exists, any face that is not visible
+      // always shows the force colors. Faces are forced the moment they rotate
+      // out of view, so the swap is never seen on screen.
+      if (this.forceSnapshot && this.forceModeActive) {
+        this.enforceHiddenFaces(false);
       }
 
       this.renderer.render(this.scene, this.camera);
@@ -163,12 +167,16 @@ export class CubeScene {
   reset() {
     const solved = createSolvedState();
     this.cube.setState(solved);
-    this.forceModeActive = false;
-    this.phase1Completed = false;
-    this.lastMoveWasL = false;
-    this.initialVisibleFaces.clear();
-    this.forcedFaces.clear();
-    this.onForceActiveChange?.(false);
+    this.prevHiddenFaces.clear();
+    if (this.forceSnapshot) {
+      // Keep the force running after a reset — snapshot stays set.
+      this.forceModeActive = true;
+      this.enforceHiddenFaces(true);
+      this.onForceActiveChange?.(true);
+    } else {
+      this.forceModeActive = false;
+      this.onForceActiveChange?.(false);
+    }
   }
 
   executeMove(move: MoveType) {
@@ -183,6 +191,15 @@ export class CubeScene {
 
   getState(): CubeStateData {
     return this.cube.getState();
+  }
+
+  /** Load a full cube state (e.g. a saved preset) and keep force running. */
+  setState(state: CubeStateData) {
+    this.cube.setState(state);
+    this.prevHiddenFaces.clear();
+    if (this.forceSnapshot && this.forceModeActive) {
+      this.enforceHiddenFaces(true);
+    }
   }
 
   /** Get the sequence of inverse moves that will solve the cube */
@@ -204,76 +221,111 @@ export class CubeScene {
     this.cube.clearHistory();
   }
 
-  // ─── Force Mode ──────────────────────────────────────────────
+  // ─── Force Mode (continuous, always-on) ──────────────────────
 
-  /** Clear force snapshot and reset all force state */
+  /** Restore a persisted snapshot from localStorage, if any. */
+  private loadPersistedSnapshot() {
+    try {
+      const raw = localStorage.getItem(FORCE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as ForceCubieSnapshot[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        this.forceSnapshot = parsed;
+        this.forceModeActive = true;
+        this.prevHiddenFaces.clear();
+        this.onForceActiveChange?.(true);
+      }
+    } catch {
+      /* ignore malformed data */
+    }
+  }
+
+  /** Clear force snapshot and stop the force. */
   clearForceSnapshot() {
     this.forceSnapshot = null;
     this.forceModeActive = false;
-    this.phase1Completed = false;
-    this.lastMoveWasL = false;
-    this.initialVisibleFaces.clear();
-    this.forcedFaces.clear();
+    this.prevHiddenFaces.clear();
+    try {
+      localStorage.removeItem(FORCE_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
     this.onForceActiveChange?.(false);
   }
 
-  /** Store complete cube snapshot */
+  /**
+   * Store a complete cube snapshot and immediately start the always-on force.
+   * From this point the hidden faces will permanently show these colors —
+   * no activation needed, and it survives scrambles and reloads.
+   */
   setForceSnapshot() {
     this.forceSnapshot = this.cube.takeForceSnapshot();
+    try {
+      localStorage.setItem(FORCE_STORAGE_KEY, JSON.stringify(this.forceSnapshot));
+    } catch {
+      /* ignore quota errors */
+    }
+    this.forceModeActive = true;
+    this.prevHiddenFaces.clear();
+    this.enforceHiddenFaces(true);
+    this.onForceActiveChange?.(true);
   }
 
   getForceSnapshot(): ForceCubieSnapshot[] | null {
     return this.forceSnapshot;
   }
 
-  /** Activate force mode */
+  /**
+   * Kept for backwards compatibility with the old manual trigger.
+   * Force is now automatic, so this simply makes sure it is running.
+   */
   activateForceMode() {
-    if (this.isForceModeActive() || !this.forceSnapshot) return;
-
+    if (!this.forceSnapshot || this.forceModeActive) return;
     this.forceModeActive = true;
-    this.phase1Completed = true;
-    this.lastMoveWasL = false;
-    this.forcedFaces.clear();
-
-    // Record which faces are currently visible
-    const currentVis = this.computeFaceVisibility();
-    this.initialVisibleFaces.clear();
-    for (const [face, isVisible] of Object.entries(currentVis)) {
-      if (isVisible) this.initialVisibleFaces.add(face as FaceKey);
-    }
-
-    // Immediately force the currently hidden faces
-    this.applyForceToCurrentlyHiddenFaces();
-
+    this.prevHiddenFaces.clear();
+    this.enforceHiddenFaces(true);
     this.onForceActiveChange?.(true);
   }
 
-  /** Deactivate force mode */
-  deactivateForceMode() {
-    this.forceModeActive = false;
-    this.phase1Completed = false;
-    this.lastMoveWasL = false;
-    this.onForceActiveChange?.(false);
+  isForceModeActive(): boolean {
+    return this.forceModeActive;
   }
 
-  isForceModeActive(): boolean { return this.forceModeActive; }
-
-  /** Immediately apply force to faces currently hidden */
-  private applyForceToCurrentlyHiddenFaces() {
+  /**
+   * Apply the force snapshot to every face that is currently not visible.
+   *
+   * @param forceAll  When true, re-force ALL currently-hidden faces (used after
+   *                  a move, which may have altered a hidden face's stickers).
+   *                  When false, only force faces that JUST became hidden this
+   *                  frame — cheap, so it can run every render frame.
+   */
+  private enforceHiddenFaces(forceAll: boolean) {
     if (!this.forceSnapshot) return;
+    // Never touch cubies mid-turn (drag, snap-settle or programmatic anim) —
+    // wait until the layer has fully settled to avoid resetting quaternions.
+    if (this.cube.isBusy()) return;
 
-    const currentVis = this.computeFaceVisibility();
-    const facesToForce: FaceKey[] = [];
-
-    for (const [face, isVisible] of Object.entries(currentVis)) {
-      if (!isVisible && !this.forcedFaces.has(face as FaceKey)) {
-        facesToForce.push(face as FaceKey);
-      }
+    const vis = this.computeFaceVisibility();
+    const hidden = new Set<FaceKey>();
+    for (const [face, isVisible] of Object.entries(vis)) {
+      if (!isVisible) hidden.add(face as FaceKey);
     }
 
-    if (facesToForce.length > 0) {
-      this.cube.applyForceSnapshot(this.forceSnapshot, facesToForce);
-      facesToForce.forEach(f => this.forcedFaces.add(f));
+    let toForce: FaceKey[];
+    if (forceAll) {
+      toForce = [...hidden];
+    } else {
+      toForce = [...hidden].filter((f) => !this.prevHiddenFaces.has(f));
+    }
+
+    this.prevHiddenFaces = hidden;
+
+    if (toForce.length === 0) return;
+
+    // Apply one face at a time so a shared edge/corner cubie's quaternion is
+    // never reset while it still contributes a sticker to a visible face.
+    for (const face of toForce) {
+      this.cube.applyForceSnapshot(this.forceSnapshot, [face]);
     }
   }
 
@@ -283,7 +335,7 @@ export class CubeScene {
 
     const camForward = new THREE.Vector3(0, 0, -1).transformDirection(this.camera.matrixWorld).normalize();
 
-    const result: Record<FaceKey, boolean> = {} as any;
+    const result: Record<FaceKey, boolean> = {} as Record<FaceKey, boolean>;
 
     for (const [face, localNormal] of Object.entries(this.faceNormals)) {
       const worldNormal = localNormal.clone().transformDirection(this.cubeGroup.matrixWorld).normalize();
@@ -293,102 +345,16 @@ export class CubeScene {
     return result;
   }
 
-  /** Called each frame while force mode is active */
-  private checkAndForceNewlyHidden() {
-    if (!this.forceSnapshot || !this.forceModeActive) return;
-
-    const currentVis = this.computeFaceVisibility();
-    const newlyHidden: FaceKey[] = [];
-
-    // Check faces that were initially visible - if they're now hidden, force them.
-    // Each initially-visible face is forced the moment it rotates away from the
-    // camera, so the swap is never seen on screen.
-    for (const face of this.initialVisibleFaces) {
-      if (!currentVis[face] && !this.forcedFaces.has(face)) {
-        newlyHidden.push(face);
-      }
-    }
-
-    if (newlyHidden.length > 0) {
-      // Apply one-by-one so a rotating cubie's quaternion is never reset mid-turn
-      for (const face of newlyHidden) {
-        this.cube.applyForceSnapshot(this.forceSnapshot, [face]);
-        this.forcedFaces.add(face);
-      }
-    }
-
-    // Only complete once EVERY face has force colors. This means the three
-    // originally-visible faces will each get forced as they rotate out of view;
-    // when the last one is hidden and forced, all six faces are force and the
-    // sequence finishes.
-    if (this.forcedFaces.size >= 6) {
-      this.forceModeActive = false;
-      this.phase1Completed = false;
-      this.initialVisibleFaces.clear();
-      this.forcedFaces.clear();
-      this.lastMoveWasL = false;
-      this.onForceActiveChange?.(false);
-    }
-  }
-
   private handleMoveExecuted(move: MoveType) {
     // Notify listeners of every executed move (used for the move counter).
     this.onUserMove?.(move);
 
-    // Expected presentation state check:
-    // 1. Phase 1 has completed.
-    // 2. Force mode is active.
-    // 3. The snapshot exists.
-    // 4. Some but not all faces are forced (Phase 1 ran but Phase 2 hasn't).
-    const isPresentationState =
-      this.phase1Completed &&
-      this.forceModeActive &&
-      this.forceSnapshot !== null &&
-      this.forcedFaces.size > 0 &&
-      this.forcedFaces.size < 6;
-
-    if (move === 'L' && isPresentationState) {
-      // Pause auto-detection so it doesn't consume remaining faces before Phase 2
-      this.forceModeActive = false;
-      this.lastMoveWasL = true;
-    } else if (move === "L'" && this.lastMoveWasL && this.phase1Completed && this.forceSnapshot && this.forcedFaces.size > 0 && this.forcedFaces.size < 6) {
-      // L' after L → trigger Phase 2 on ALL remaining faces at once
-      this.lastMoveWasL = false;
-      this.executePhase2();
-    } else if (move === 'L') {
-      this.lastMoveWasL = true;
-    } else {
-      // Any other move resets the L tracking and resumes auto-detection if applicable
-      this.lastMoveWasL = false;
-      if (this.phase1Completed && !this.forceModeActive && this.forceSnapshot && this.forcedFaces.size > 0 && this.forcedFaces.size < 6) {
-        this.forceModeActive = true;
-      }
+    // A move can change stickers on faces that are currently hidden (e.g. an R
+    // turn alters the back face's right column). Re-force every hidden face so
+    // the force is always preserved — even while scrambling / mixing.
+    if (this.forceSnapshot && this.forceModeActive) {
+      this.enforceHiddenFaces(true);
     }
-  }
-
-  private executePhase2() {
-    if (!this.forceSnapshot || !this.phase1Completed) return;
-
-    // Remaining faces are initially visible faces that haven't been forced yet
-    const remainingFaces: FaceKey[] = [];
-    for (const face of this.initialVisibleFaces) {
-      if (!this.forcedFaces.has(face)) {
-        remainingFaces.push(face);
-      }
-    }
-
-    if (remainingFaces.length > 0) {
-      // Apply force snapshot one-by-one for each face to prevent resetting quaternions of rotating cubies
-      for (const face of remainingFaces) {
-        this.cube.applyForceSnapshot(this.forceSnapshot, [face]);
-        this.forcedFaces.add(face);
-      }
-    }
-
-    // Force complete - deactivate and reset flags
-    this.forceModeActive = false;
-    this.phase1Completed = false;
-    this.onForceActiveChange?.(false);
   }
 
   destroy() {

@@ -171,8 +171,9 @@ function ForcePanel({
               </button>
             </div>
             <div className="force-hint">
-              <p><strong>Fáza 1:</strong> Dvojité ťuknutie na stred-vrch aktivuje Force Mode. Skryté plochy si udržiavajú farby.</p>
-              <p><strong>Fáza 2:</strong> Otočte kocku aby boli pôvodne viditeľné plochy skryté, potom urobte L a potom L&apos;.</p>
+              <p><strong>Automatický režim:</strong> Keď uložíš snapshot, force beží stále sám. Nemusíš už nič spúšťať.</p>
+              <p>Plochy, ktoré <strong>nie sú vidieť</strong>, budú vždy mať uložené farby (force). Plocha, ktorú vidíš, sa dá normálne miešať &mdash; a aj keď kocku zamiešaš, skryté strany ostanú vždy force.</p>
+              <p>Nastavenie ostáva uložené aj po zatvorení appky &mdash; funguje trvalo, kým force nevymažeš.</p>
             </div>
 
             {/* ── Divider ── */}

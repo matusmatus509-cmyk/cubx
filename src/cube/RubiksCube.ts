@@ -830,11 +830,11 @@ export class RubiksCube {
         default: continue;
       }
 
-      const geo = new THREE.PlaneGeometry(STICKER_SCALE, STICKER_SCALE);
+      const geo = createRoundedStickerGeometry(STICKER_SCALE, STICKER_SCALE * STICKER_CORNER_RADIUS);
       const mat = new THREE.MeshPhongMaterial({
         color: new THREE.Color(colorHex),
-        shininess: 100,
-        specular: new THREE.Color(0x888888),
+        shininess: 180,
+        specular: new THREE.Color(0xaaaaaa),
       });
       const sticker = new THREE.Mesh(geo, mat);
       sticker.position.set(...pos);

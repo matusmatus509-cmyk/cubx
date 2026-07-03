@@ -222,9 +222,19 @@ export class CubeScene {
     this.onForceActiveChange?.(false);
   }
 
-  /** Store complete cube snapshot */
+  /** Capture the current live state as a ForceCubieSnapshot array (for saving to presets) */
+  takeForceSnapshot(): ForceCubieSnapshot[] {
+    return this.cube.takeForceSnapshot();
+  }
+
+  /** Store complete cube snapshot from current live state */
   setForceSnapshot() {
     this.forceSnapshot = this.cube.takeForceSnapshot();
+  }
+
+  /** Set force snapshot directly from previously saved data (does NOT change the cube's visual state) */
+  setForceSnapshotFromData(snapshots: ForceCubieSnapshot[]) {
+    this.forceSnapshot = snapshots;
   }
 
   getForceSnapshot(): ForceCubieSnapshot[] | null {

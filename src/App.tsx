@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { CubeScene } from './cube/CubeScene';
-import { isSolved, MoveType, CubeStateData } from './cube/CubeState';
+import { isSolved, MoveType } from './cube/CubeState';
+import { ForceCubieSnapshot } from './cube/RubiksCube';
 
 const PRESET_STORAGE_KEY = 'cubemix_presets';
 const DEFAULT_PRESET_KEY = 'cubemix_default_preset';
@@ -11,7 +12,7 @@ const SHOW_TITLE_KEY = 'cubemix_show_title';
 interface Preset {
   id: string;
   name: string;
-  state: CubeStateData;
+  forceSnapshot: ForceCubieSnapshot[];
   savedAt: number;
 }
 
@@ -77,12 +78,13 @@ function ForcePanel({
         setNameInput('');
         setBgUrl(localStorage.getItem(BG_STORAGE_KEY) ?? '');
         setShowTitle(localStorage.getItem(SHOW_TITLE_KEY) !== 'false');
-        // Apply default preset immediately on open
+        // Apply default preset as force snapshot on open (does not change cube visual state)
         const defId = localStorage.getItem(DEFAULT_PRESET_KEY);
         if (defId && cubeScene) {
           const defPreset = loaded.find(p => p.id === defId);
           if (defPreset) {
-            cubeScene.setState(defPreset.state);
+            cubeScene.setForceSnapshotFromData(defPreset.forceSnapshot);
+            setForceSnapshotExists(true);
           }
         }
       }
@@ -135,10 +137,10 @@ function ForcePanel({
     const handleSavePreset = () => {
       if (!cubeScene || !namingSlot) return;
       const name = nameInput.trim() || `Preset ${presets.length + 1}`;
-      const state = cubeScene.getState();
+      const forceSnapshot = cubeScene.takeForceSnapshot();
       const updated = [
         ...presets.filter(p => p.id !== namingSlot),
-        { id: namingSlot, name, state, savedAt: Date.now() },
+        { id: namingSlot, name, forceSnapshot, savedAt: Date.now() },
       ].slice(-MAX_PRESETS);
       savePresets(updated);
       setPresets(updated);
@@ -149,8 +151,9 @@ function ForcePanel({
 
     const handleLoadPreset = (preset: Preset) => {
       if (!cubeScene) return;
-      cubeScene.setState(preset.state);
-      setStatus(`Nastavený: "${preset.name}"`);
+      cubeScene.setForceSnapshotFromData(preset.forceSnapshot);
+      setForceSnapshotExists(true);
+      setStatus(`Force nastavený: "${preset.name}"`);
     };
 
     const handleDeletePreset = (id: string) => {
@@ -172,11 +175,14 @@ function ForcePanel({
       } else {
         localStorage.setItem(DEFAULT_PRESET_KEY, id);
         setDefaultPresetId(id);
-        // Also apply immediately
+        // Set as force snapshot immediately (does not change cube state)
         const preset = presets.find(p => p.id === id);
-        if (preset && cubeScene) cubeScene.setState(preset.state);
+        if (preset && cubeScene) {
+          cubeScene.setForceSnapshotFromData(preset.forceSnapshot);
+          setForceSnapshotExists(true);
+        }
         const name = preset?.name ?? '';
-        setStatus(`"${name}" nastavený ako predvolený`);
+        setStatus(`"${name}" nastavený ako predvolený force`);
       }
     };
 
@@ -266,7 +272,7 @@ function ForcePanel({
 
             {/* ── Preset snapshots section ── */}
             <div className="force-section-title">Presety kocky</div>
-            <div className="preset-hint">Ťuknutím na preset ho okamžite nastavíš. Hviezdičkou nastavíš predvolený (načíta sa pri každom otvorení).</div>
+            <div className="preset-hint">Ťuknutím nastavíš preset ako force — kocka sa naň zafixuje pri ďalšom pohybe. Hviezdičkou nastavíš predvolený (automaticky sa nastaví ako force pri otvorení).</div>
 
             {presets.length === 0 && (
               <div className="force-status">Žiadne presety uložené</div>

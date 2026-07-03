@@ -525,20 +525,21 @@ export default function App() {
 
       {/* Top bar */}
       <header className="topbar">
-        <button className="topbar-icon" onClick={() => setShowPanel(!showPanel)}>
+        <button 
+          className="topbar-icon" 
+          onClick={() => setShowPanel(!showPanel)}
+          onMouseDown={onTitleMouseDown}
+          onMouseUp={onTitleMouseUp}
+          onMouseLeave={onTitleMouseUp}
+          onTouchStart={onTitleMouseDown}
+          onTouchEnd={onTitleMouseUp}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
         {showTitle && (
-          <span 
-            className="topbar-title" 
-            onMouseDown={onTitleMouseDown}
-            onMouseUp={onTitleMouseUp}
-            onMouseLeave={onTitleMouseUp}
-            onTouchStart={onTitleMouseDown}
-            onTouchEnd={onTitleMouseUp}
-          >
+          <span className="topbar-title">
             CUBEMIX
           </span>
         )}

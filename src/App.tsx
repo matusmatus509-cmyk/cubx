@@ -5,6 +5,7 @@ import { ForceCubieSnapshot } from './cube/RubiksCube';
 
 const PRESET_STORAGE_KEY = 'cubemix_presets';
 const DEFAULT_PRESET_KEY = 'cubemix_default_preset';
+const FORCE_ON_STARTUP_KEY = 'cubemix_force_on_startup';
 const MAX_PRESETS = 5;
 const BG_STORAGE_KEY = 'cubemix_bg';
 const SHOW_TITLE_KEY = 'cubemix_show_title';
@@ -65,6 +66,7 @@ function ForcePanel({
     const [nameInput, setNameInput] = useState('');
     const [bgUrl, setBgUrl] = useState<string>(() => localStorage.getItem(BG_STORAGE_KEY) ?? '');
     const [showTitle, setShowTitle] = useState<boolean>(() => localStorage.getItem(SHOW_TITLE_KEY) !== 'false');
+    const [forceOnStartup, setForceOnStartup] = useState<boolean>(() => localStorage.getItem(FORCE_ON_STARTUP_KEY) === 'true');
     const bgInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -78,6 +80,7 @@ function ForcePanel({
         setNameInput('');
         setBgUrl(localStorage.getItem(BG_STORAGE_KEY) ?? '');
         setShowTitle(localStorage.getItem(SHOW_TITLE_KEY) !== 'false');
+        setForceOnStartup(localStorage.getItem(FORCE_ON_STARTUP_KEY) === 'true');
         // Apply default preset as force snapshot on open (does not change cube visual state)
         const defId = localStorage.getItem(DEFAULT_PRESET_KEY);
         if (defId && cubeScene) {
@@ -116,6 +119,12 @@ function ForcePanel({
       setShowTitle(next);
       localStorage.setItem(SHOW_TITLE_KEY, String(next));
       onTitleToggle(next);
+    };
+
+    const handleForceOnStartupToggle = () => {
+      const next = !forceOnStartup;
+      setForceOnStartup(next);
+      localStorage.setItem(FORCE_ON_STARTUP_KEY, String(next));
     };
 
     if (!isOpen) return null;
@@ -262,6 +271,23 @@ function ForcePanel({
                 onClick={handleTitleToggle}
                 aria-pressed={showTitle}
                 aria-label="Zobraziť nápis"
+              >
+                <span className="toggle-knob" />
+              </button>
+            </div>
+
+            {/* ── Force on startup section ── */}
+            <div className="force-section-title">Force pri zapínaní</div>
+            <div className="title-toggle-row">
+              <div className="startup-toggle-text">
+                <span className="title-toggle-label">Aktivovať force pri spustení</span>
+                <span className="startup-toggle-hint">Vyžaduje predvolený preset (hviezdička)</span>
+              </div>
+              <button
+                className={`toggle-switch ${forceOnStartup ? 'toggle-on' : ''}`}
+                onClick={handleForceOnStartupToggle}
+                aria-pressed={forceOnStartup}
+                aria-label="Aktivovať force pri spustení"
               >
                 <span className="toggle-knob" />
               </button>
@@ -486,6 +512,21 @@ export default function App() {
       }
     });
     scene.onForceActiveChange = setForceActive;
+
+    // Apply force on startup if setting is enabled and a default preset exists
+    const forceOnStartup = localStorage.getItem(FORCE_ON_STARTUP_KEY) === 'true';
+    if (forceOnStartup) {
+      const defId = localStorage.getItem(DEFAULT_PRESET_KEY);
+      if (defId) {
+        const presets = loadPresets();
+        const defPreset = presets.find(p => p.id === defId);
+        if (defPreset) {
+          scene.setForceSnapshotFromData(defPreset.forceSnapshot);
+          scene.activateForceMode();
+        }
+      }
+    }
+
     return () => {
       if (titlePressTimer.current) clearTimeout(titlePressTimer.current);
       scene.destroy(); cubeSceneRef.current = null;

@@ -653,6 +653,19 @@ html, body {
   font-weight: 500;
   color: var(--text);
   flex: 1;
+  display: block;
+}
+.startup-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.startup-toggle-hint {
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.4;
 }
 
 .toggle-switch {

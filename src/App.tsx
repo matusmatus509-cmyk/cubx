@@ -595,9 +595,16 @@ export default function App() {
   const busy = scrambling || solving;
 
   const lastTapRef = useRef<number>(0);
-  const handleSecretTrigger = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+
+  // Global double-click / double-tap activates force mode anywhere on screen
+  const handleGlobalDoubleClick = useCallback(() => {
+    if (cubeSceneRef.current && !cubeSceneRef.current.isForceModeActive() && cubeSceneRef.current.getForceSnapshot()) {
+      cubeSceneRef.current.activateForceMode();
+    }
+  }, []);
+
+  // Touch double-tap (touchstart fires before dblclick on mobile)
+  const handleGlobalTouchStart = useCallback(() => {
     const now = performance.now();
     if (now - lastTapRef.current < 300) {
       if (cubeSceneRef.current && !cubeSceneRef.current.isForceModeActive() && cubeSceneRef.current.getForceSnapshot()) {
@@ -621,13 +628,11 @@ export default function App() {
   };
 
   return (
-    <div className="app-root">
-      {/* Secret trigger area */}
-      <div 
-        className="secret-trigger-area" 
-        onMouseDown={handleSecretTrigger}
-        onTouchStart={handleSecretTrigger}
-      />
+    <div
+      className="app-root"
+      onDoubleClick={handleGlobalDoubleClick}
+      onTouchStart={handleGlobalTouchStart}
+    >
 
       {/* Top bar */}
       <header className="topbar">

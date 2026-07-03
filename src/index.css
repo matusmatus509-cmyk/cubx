@@ -789,16 +789,9 @@ html, body {
 }
 
 /* ── SECRET TRIGGER ── */
-.secret-trigger-area {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 160px;
-  height: 54px;
-  background: transparent;
-  z-index: 30;
-  cursor: default;
+/* secret-trigger-area removed — force is now activated by double-click/tap anywhere */
+.secret-trigger-area-unused {
+  display: none;
   touch-action: manipulation;
   user-select: none;
   pointer-events: auto;

@@ -496,18 +496,52 @@ html, body {
   margin: 2px 0;
 }
 
-.preset-row {
+.preset-hint {
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.55;
+  padding: 2px 0 2px;
+}
+
+.preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preset-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
-  background: rgba(255,255,255,0.03);
+  width: 100%;
+  padding: 14px 12px 14px 16px;
+  background: rgba(255,255,255,0.04);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  touch-action: manipulation;
+  transition: background 0.12s, border-color 0.12s, transform 0.08s;
+  -webkit-tap-highlight-color: transparent;
 }
-.preset-name {
-  font-size: 13px;
+.preset-card:active {
+  transform: scale(0.97);
+  background: rgba(59,130,246,0.08);
+  border-color: rgba(59,130,246,0.25);
+}
+.preset-card-default {
+  border-color: rgba(250,204,21,0.35);
+  background: rgba(250,204,21,0.05);
+}
+.preset-card-default:active {
+  background: rgba(250,204,21,0.1);
+  border-color: rgba(250,204,21,0.5);
+}
+
+.preset-card-name {
+  font-size: 14px;
   font-weight: 500;
   color: var(--text);
   flex: 1;
@@ -515,14 +549,69 @@ html, body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.preset-actions {
+
+.preset-card-actions {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
 }
-.preset-btn {
-  padding: 6px 10px !important;
-  font-size: 12px !important;
+
+.preset-star-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(255,255,255,0.3);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.12s, background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+}
+.preset-star-btn:active {
+  background: rgba(250,204,21,0.12);
+}
+.preset-star-on {
+  color: #facc15;
+}
+
+.preset-delete-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(255,255,255,0.25);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.12s, background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+}
+.preset-delete-btn:active {
+  color: #f87171;
+  background: rgba(248,113,113,0.1);
+}
+
+.preset-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border-style: dashed !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: var(--text2) !important;
+  font-size: 13px;
+  padding: 13px 16px;
 }
 
 .preset-name-row {

@@ -3,6 +3,7 @@ import { CubeScene } from './cube/CubeScene';
 import { isSolved, MoveType, CubeStateData } from './cube/CubeState';
 
 const PRESET_STORAGE_KEY = 'cubemix_presets';
+const DEFAULT_PRESET_KEY = 'cubemix_default_preset';
 const MAX_PRESETS = 5;
 const BG_STORAGE_KEY = 'cubemix_bg';
 const SHOW_TITLE_KEY = 'cubemix_show_title';
@@ -58,6 +59,7 @@ function ForcePanel({
     const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
     const [status, setStatus] = useState<string>('');
     const [presets, setPresets] = useState<Preset[]>([]);
+    const [defaultPresetId, setDefaultPresetId] = useState<string | null>(null);
     const [namingSlot, setNamingSlot] = useState<string | null>(null);
     const [nameInput, setNameInput] = useState('');
     const [bgUrl, setBgUrl] = useState<string>(() => localStorage.getItem(BG_STORAGE_KEY) ?? '');
@@ -67,12 +69,22 @@ function ForcePanel({
     useEffect(() => {
       if (isOpen) {
         if (cubeScene) setForceSnapshotExists(!!cubeScene.getForceSnapshot());
-        setPresets(loadPresets());
+        const loaded = loadPresets();
+        setPresets(loaded);
+        setDefaultPresetId(localStorage.getItem(DEFAULT_PRESET_KEY));
         setStatus('');
         setNamingSlot(null);
         setNameInput('');
         setBgUrl(localStorage.getItem(BG_STORAGE_KEY) ?? '');
         setShowTitle(localStorage.getItem(SHOW_TITLE_KEY) !== 'false');
+        // Apply default preset immediately on open
+        const defId = localStorage.getItem(DEFAULT_PRESET_KEY);
+        if (defId && cubeScene) {
+          const defPreset = loaded.find(p => p.id === defId);
+          if (defPreset) {
+            cubeScene.setState(defPreset.state);
+          }
+        }
       }
     }, [cubeScene, isOpen]);
 
@@ -138,13 +150,34 @@ function ForcePanel({
     const handleLoadPreset = (preset: Preset) => {
       if (!cubeScene) return;
       cubeScene.setState(preset.state);
-      setStatus(`Načítaný: "${preset.name}"`);
+      setStatus(`Nastavený: "${preset.name}"`);
     };
 
     const handleDeletePreset = (id: string) => {
       const updated = presets.filter(p => p.id !== id);
       savePresets(updated);
       setPresets(updated);
+      if (defaultPresetId === id) {
+        localStorage.removeItem(DEFAULT_PRESET_KEY);
+        setDefaultPresetId(null);
+      }
+    };
+
+    const handleSetDefault = (id: string) => {
+      if (defaultPresetId === id) {
+        // Unpin
+        localStorage.removeItem(DEFAULT_PRESET_KEY);
+        setDefaultPresetId(null);
+        setStatus('Predvolený preset zrušený');
+      } else {
+        localStorage.setItem(DEFAULT_PRESET_KEY, id);
+        setDefaultPresetId(id);
+        // Also apply immediately
+        const preset = presets.find(p => p.id === id);
+        if (preset && cubeScene) cubeScene.setState(preset.state);
+        const name = preset?.name ?? '';
+        setStatus(`"${name}" nastavený ako predvolený`);
+      }
     };
 
     return (
@@ -233,24 +266,47 @@ function ForcePanel({
 
             {/* ── Preset snapshots section ── */}
             <div className="force-section-title">Presety kocky</div>
+            <div className="preset-hint">Ťuknutím na preset ho okamžite nastavíš. Hviezdičkou nastavíš predvolený (načíta sa pri každom otvorení).</div>
 
             {presets.length === 0 && (
               <div className="force-status">Žiadne presety uložené</div>
             )}
 
-            {presets.map(preset => (
-              <div key={preset.id} className="preset-row">
-                <span className="preset-name">{preset.name}</span>
-                <div className="preset-actions">
-                  <button className="force-btn preset-btn" onClick={() => handleLoadPreset(preset)}>
-                    Načítať
+            <div className="preset-list">
+              {presets.map(preset => {
+                const isDefault = defaultPresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    className={`preset-card${isDefault ? ' preset-card-default' : ''}`}
+                    onClick={() => handleLoadPreset(preset)}
+                  >
+                    <span className="preset-card-name">{preset.name}</span>
+                    <div className="preset-card-actions" onClick={e => e.stopPropagation()}>
+                      <button
+                        className={`preset-star-btn${isDefault ? ' preset-star-on' : ''}`}
+                        onClick={() => handleSetDefault(preset.id)}
+                        aria-label={isDefault ? 'Zrušiť predvolený' : 'Nastaviť ako predvolený'}
+                        title={isDefault ? 'Predvolený — klikni na zrušenie' : 'Nastaviť ako predvolený'}
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill={isDefault ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                        </svg>
+                      </button>
+                      <button
+                        className="preset-delete-btn"
+                        onClick={() => handleDeletePreset(preset.id)}
+                        aria-label="Vymazať preset"
+                      >
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
                   </button>
-                  <button className="force-btn force-btn-danger preset-btn" onClick={() => handleDeletePreset(preset.id)}>
-                    ✕
-                  </button>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
 
             {presets.length < MAX_PRESETS && (
               namingSlot ? (
@@ -268,10 +324,13 @@ function ForcePanel({
                 </div>
               ) : (
                 <button
-                  className="force-btn"
+                  className="force-btn preset-add-btn"
                   onClick={() => { setNamingSlot(`preset_${Date.now()}`); setNameInput(''); }}
                 >
-                  + Uložiť aktuálny stav kocky
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Uložiť aktuálny stav kocky
                 </button>
               )
             )}

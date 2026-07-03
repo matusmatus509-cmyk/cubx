@@ -3,12 +3,12 @@
 
 export const FACE_COLORS: Record<string, string> = {
   U: '#ffffff', // white
-  D: '#ffdd00', // yellow
+  D: '#ffd500', // yellow — classic bright golden-yellow
   F: '#009b48', // green
-  B: '#0046ad', // blue
-  L: '#ff5900', // orange
-  R: '#b90000', // red
-  X: '#1a1a1a', // black (inner)
+  B: '#0051ad', // blue
+  L: '#ff5800', // orange — vivid classic orange
+  R: '#c41e3a', // red — classic deeper red
+  X: '#111111', // black (inner)
 };
 
 export type FaceColor = 'U' | 'D' | 'F' | 'B' | 'L' | 'R' | 'X';

@@ -3,15 +3,15 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { CubeStateData, FACE_COLORS, applyMove, MoveType, FaceKey, FaceColor, createSolvedState } from './CubeState';
 
 export const CUBIE_SIZE = 1;
-export const GAP = 0.012;
+export const GAP = 0.055;
 export const TOTAL = CUBIE_SIZE + GAP;
-const STICKER_SCALE = 0.92;
-const STICKER_DEPTH = 0.005;
+const STICKER_SCALE = 0.86;
+const STICKER_DEPTH = 0.006;
 // Rounded body corner radius + smoothing segments
-const BODY_RADIUS = 0.12;
-const BODY_SEGMENTS = 4;
+const BODY_RADIUS = 0.08;
+const BODY_SEGMENTS = 5;
 // Corner radius of the rounded sticker (as a fraction of the sticker size)
-const STICKER_CORNER_RADIUS = 0.16;
+const STICKER_CORNER_RADIUS = 0.12;
 const SNAP_ANIM_DURATION = 220; // ms for snap animation after release
 
 /** Complete snapshot of a single cubie for Force Cube storage */
@@ -107,8 +107,9 @@ export class RubiksCube {
           // Black body (rounded edges for a softer, real-cube look)
           const bodyGeo = new RoundedBoxGeometry(CUBIE_SIZE, CUBIE_SIZE, CUBIE_SIZE, BODY_SEGMENTS, BODY_RADIUS);
           const bodyMat = new THREE.MeshPhongMaterial({
-            color: 0x111111,
-            shininess: 30,
+            color: 0x080808,
+            shininess: 60,
+            specular: new THREE.Color(0x222222),
           });
           const body = new THREE.Mesh(bodyGeo, bodyMat);
           group.add(body);
@@ -161,8 +162,8 @@ export class RubiksCube {
       const geo = createRoundedStickerGeometry(STICKER_SCALE, STICKER_SCALE * STICKER_CORNER_RADIUS);
       const mat = new THREE.MeshPhongMaterial({
         color: new THREE.Color(color),
-        shininess: 100,
-        specular: new THREE.Color(0x888888),
+        shininess: 180,
+        specular: new THREE.Color(0xaaaaaa),
       });
       const sticker = new THREE.Mesh(geo, mat);
       sticker.position.set(...fc.pos);

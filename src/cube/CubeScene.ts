@@ -68,11 +68,12 @@ export class CubeScene {
     this.cubeGroup = new THREE.Group();
     this.scene.add(this.cubeGroup);
 
-    // Initial isometric-like tilt
-    this.cubeGroup.rotation.x = 0.35;
-    this.cubeGroup.rotation.y = 0.65;
+    // Isometric tilt matching the classic Rubik's cube photo angle:
+    // x-tilt shows the top face clearly, y-tilt shows both left and right faces
+    this.cubeGroup.rotation.x = 0.52;
+    this.cubeGroup.rotation.y = 0.75;
     // Offset cube upward slightly to compensate for the x-tilt visual shift
-    this.cubeGroup.position.y = 0.35;
+    this.cubeGroup.position.y = 0.3;
 
     // Create cube
     const initialState = createSolvedState();
@@ -106,20 +107,24 @@ export class CubeScene {
   }
 
   private setupLights() {
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    // Soft ambient so shadow faces aren't pitch-black
+    const ambient = new THREE.AmbientLight(0xffffff, 0.55);
     this.scene.add(ambient);
 
-    const dir1 = new THREE.DirectionalLight(0xffffff, 1.0);
-    dir1.position.set(5, 8, 6);
-    this.scene.add(dir1);
+    // Main key light from upper-left front — lights the top and left faces brightest
+    const key = new THREE.DirectionalLight(0xffffff, 1.4);
+    key.position.set(-4, 9, 7);
+    this.scene.add(key);
 
-    const dir2 = new THREE.DirectionalLight(0x8899ff, 0.3);
-    dir2.position.set(-4, -3, -4);
-    this.scene.add(dir2);
+    // Fill light from right side — adds separation to the right face
+    const fill = new THREE.DirectionalLight(0xffffff, 0.55);
+    fill.position.set(7, 2, 4);
+    this.scene.add(fill);
 
-    const dir3 = new THREE.DirectionalLight(0xffeecc, 0.2);
-    dir3.position.set(0, 0, -5);
-    this.scene.add(dir3);
+    // Subtle back/bottom rim to keep the cube from merging with the dark bg
+    const rim = new THREE.DirectionalLight(0xffffff, 0.15);
+    rim.position.set(0, -5, -6);
+    this.scene.add(rim);
   }
 
   private startRenderLoop() {
@@ -176,8 +181,8 @@ export class CubeScene {
   }
 
   resetRotation() {
-    this.cubeGroup.rotation.x = 0.35;
-    this.cubeGroup.rotation.y = 0.65;
+    this.cubeGroup.rotation.x = 0.52;
+    this.cubeGroup.rotation.y = 0.75;
     this.cubeGroup.rotation.z = 0;
   }
 
